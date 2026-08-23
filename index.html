@@ -514,7 +514,7 @@
       let r1 = valToRadius(yearData[i]) + (8 * window.devicePixelRatio);
       let r2 = valToRadius(yearData[iNext]) + (8 * window.devicePixelRatio);
 
-      let alpha = ((diffs[i] + diffs[iNext]) / (2 * maxDiff)) * 0.30;
+      let alpha = ((diffs[i] + diffs[iNext]) / (2 * maxDiff)) * 0.60;
       if (alpha > 0.005) {
         pCtx.beginPath();
         pCtx.moveTo(cx + Math.cos(a1) * r1, cy + Math.sin(a1) * r1);
@@ -648,7 +648,7 @@
         let y1 = padTop + plotH - ((val1 - minTime) / (maxTime - minTime)) * plotH - redOffset;
         let y2 = padTop + plotH - ((val2 - minTime) / (maxTime - minTime)) * plotH - redOffset;
 
-        let alpha = ((diffs[d1 - 1] + diffs[d2 - 1]) / (2 * maxDiff)) * 0.30;
+        let alpha = ((diffs[d1 - 1] + diffs[d2 - 1]) / (2 * maxDiff)) * 0.60;
         if (alpha > 0.005) {
           lCtx.beginPath();
           lCtx.strokeStyle = `rgba(239, 68, 68, ${alpha})`;
