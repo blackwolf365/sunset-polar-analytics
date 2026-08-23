@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Схід та Захід сонця — Інтерактивна Аналітика</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card-bg: #151e32;
+      --panel-bg: rgba(0,0,0,0.25);
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --border: rgba(255,255,255,0.08);
+      --accent: #38bdf8;
+      --orange: #f97316;
+      --yellow: #facc15;
+      --red: #ef4444;
+      --green: #4ade80;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    
+    .container {
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 24px;
+      width: 100%;
+      max-width: 1180px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Шапка управління */
+    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .title-box h1 { font-size: 1.3rem; font-weight: 700; }
+    .title-box p { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+
+    .top-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    .coords-inputs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--panel-bg);
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .coords-inputs label { font-size: 0.75rem; color: var(--text-dim); }
+    .coords-inputs input {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 58px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    .dst-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--panel-bg);
+      padding: 6px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      user-select: none;
+    }
+    .dst-toggle input { cursor: pointer; accent-color: var(--accent); }
+
+    .view-switcher {
+      display: flex;
+      background: var(--panel-bg);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      gap: 4px;
+      width: 100%;
+      justify-content: center;
+    }
+    .view-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .view-btn.active {
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .app-layout {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      gap: 20px;
+      width: 100%;
+    }
+    @media (max-width: 960px) {
+      .app-layout { grid-template-columns: 1fr; }
+    }
+
+    .charts-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-card {
+      background: rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: opacity 0.3s ease;
+    }
+    .section-card.hidden { display: none; }
+
+    /* Полярна секція */
+    .polar-box {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      height: 480px;
+      touch-action: none;
+      cursor: pointer;
+    }
+    .center-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(21,30,50,0.96) 0%, rgba(15,23,42,0.93) 100%);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.5), 0 10px 25px rgba(0,0,0,0.4);
+      text-align: center;
+      padding: 8px;
+    }
+    .center-date { font-size: 0.85rem; font-weight: 700; color: var(--text-dim); }
+    .center-time-row { font-size: 0.8rem; font-weight: 700; margin: 3px 0; display: flex; gap: 6px; }
+    .center-daylen { font-size: 1.1rem; font-weight: 800; color: #ffffff; }
+    .season-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; margin-top: 2px; }
+
+    /* Класична секція */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      width: 100%;
+      margin-bottom: 12px;
+      background: var(--panel-bg);
+      padding: 10px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    @media (max-width: 600px) {
+      .stats-bar { grid-template-columns: repeat(3, 1fr); }
+    }
+    .stat-val { font-size: 1rem; font-weight: 700; transition: color 0.2s ease; }
+    .stat-lbl { font-size: 0.68rem; color: var(--text-dim); margin-top: 2px; }
+
+    .linear-box { position: relative; width: 100%; height: 270px; margin-bottom: 12px; cursor: crosshair; touch-action: none; }
+    canvas { width: 100%; height: 100%; display: block; }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      background: var(--panel-bg);
+      padding: 8px 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    .slider-row span { font-size: 0.75rem; color: var(--text-dim); whitespace: nowrap; }
+    .slider-row input[type="range"] { flex: 1; cursor: pointer; }
+
+    .controls-dial { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .dial-wrapper {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.08);
+      cursor: grab;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .dial-wrapper:active { cursor: grabbing; }
+    .dial-ring { position: absolute; inset: 6px; border-radius: 50%; border: 2px dashed rgba(255,255,255,0.12); }
+    .dial-pointer {
+      position: absolute;
+      top: 8px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      transform-origin: 50% 47px;
+    }
+    .dial-center {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+    }
+
+    /* Бічна панель */
+    .sidebar {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sidebar-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .legend-list { display: flex; flex-direction: column; gap: 8px; }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.76rem;
+      color: var(--text);
+    }
+    .legend-icon {
+      width: 22px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .dot-ctrl { width: 12px; height: 12px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 8px var(--accent); }
+    .dot-style-a { width: 9px; height: 9px; border-radius: 50%; background: #ffffff; border: 1.5px solid #0f172a; }
+    .dot-style-b { width: 8px; height: 8px; border-radius: 50%; background: #0b1120; border: 1.5px solid #ffffff; }
+    
+    .line-underlay-sunrise { width: 20px; height: 5px; border-radius: 3px; background: rgba(254, 240, 138, 0.6); border: 1px solid rgba(250, 204, 21, 0.4); }
+    .line-underlay-sunset { width: 20px; height: 5px; border-radius: 3px; background: rgba(254, 215, 170, 0.6); border: 1px solid rgba(249, 115, 22, 0.4); }
+    .line-red { width: 20px; height: 2px; background: var(--red); }
+
+    .events-list { display: flex; flex-direction: column; gap: 6px; }
+    .event-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      border-left: 4px solid var(--accent);
+    }
+    .event-name { font-weight: 600; color: var(--text); }
+    .event-val { font-weight: 700; }
+
+    .hint { font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="title-box">
+      <h1 id="locationTitle">🌅 Схід та Захід сонця — Колодрібка</h1>
+      <p>Синхронізована радіальна та класична візуалізація з аналізом подій</p>
+    </div>
+    <div class="top-controls">
+      <div class="coords-inputs">
+        <label>Широта:</label>
+        <input type="number" id="latInput" step="0.01" value="48.62">
+        <label>Довгота:</label>
+        <input type="number" id="lonInput" step="0.01" value="26.04">
+      </div>
+      <label class="dst-toggle">
+        <input type="checkbox" id="dstToggle" checked>
+        <span>Літній час (DST)</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Перемикач виглядів -->
+  <div class="view-switcher">
+    <button class="view-btn active" data-view="both">Обидва</button>
+    <button class="view-btn" data-view="polar">Радіальний</button>
+    <button class="view-btn" data-view="linear">Класичний</button>
+  </div>
+
+  <div class="app-layout">
+    <!-- Ліва колонка з графіками -->
+    <div class="charts-column">
+      <!-- 1. РАДІАЛЬНИЙ ГРАФІК -->
+      <div class="section-card" id="polarSection">
+        <div class="polar-box" id="polarContainer">
+          <canvas id="polarCanvas"></canvas>
+          <div class="center-overlay">
+            <div class="center-date" id="pDateVal">01 Січ</div>
+            <div class="center-time-row">
+              <span style="color: var(--yellow);" id="pSunriseVal">08:12</span>
+              <span>—</span>
+              <span style="color: var(--orange);" id="pSunsetVal">16:20</span>
+            </div>
+            <div class="center-daylen" id="pDayLenVal">8г 08хв</div>
+            <div><span class="season-badge" id="pSeasonBadge">Зима</span></div>
+          </div>
+        </div>
+        <div class="hint">💡 Крути або тискай по колу для зміни дати</div>
+      </div>
+
+      <!-- 2. КЛАСИЧНИЙ ГРАФІК -->
+      <div class="section-card" id="linearSection">
+        <div class="stats-bar">
+          <div>
+            <div class="stat-val" id="lDateVal">01 Січ</div>
+            <div class="stat-lbl">Дата</div>
+          </div>
+          <div>
+            <div class="stat-val" style="color: var(--yellow);" id="lSunriseVal">08:12</div>
+            <div class="stat-lbl">Схід сонця</div>
+          </div>
+          <div>
+            <div class="stat-val" style="color: var(--orange);" id="lSunsetVal">16:20</div>
+            <div class="stat-lbl">Захід сонця</div>
+          </div>
+          <div>
+            <div class="stat-val" id="lDayLenVal">8г 08хв</div>
+            <div class="stat-lbl">Тривалість дня</div>
+          </div>
+          <div>
+            <div class="stat-val"><span class="season-badge" id="lSeasonBadge">Зима</span></div>
+            <div class="stat-lbl">Пора року</div>
+          </div>
+        </div>
+
+        <div class="linear-box" id="linearContainer">
+          <canvas id="linearCanvas"></canvas>
+        </div>
+
+        <div class="slider-row">
+          <span>↔️ Зсув осі (центрувати місяць):</span>
+          <input type="range" id="shiftSlider" min="0" max="365" value="0">
+        </div>
+
+        <div class="controls-dial">
+          <div class="dial-wrapper" id="dial">
+            <div class="dial-ring"></div>
+            <div class="dial-pointer" id="pointer"></div>
+            <div class="dial-center" id="dialCenterText">01 Січ</div>
+          </div>
+        </div>
+        <div class="hint">💡 Натискай та тягни прямо по графіку або диск нижче</div>
+      </div>
+    </div>
+
+    <!-- Права колонка: Легенда та Астрономічна інформація -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Легенда графіку</div>
+        <div class="legend-list">
+          <div class="legend-item">
+            <div class="legend-icon"><div class="dot-ctrl"></div></div>
+            <span>Точки управління активною датою</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon"><div class="line-underlay-sunrise"></div></div>
+            <span>Підкладка Сходу</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon"><div class="line-underlay-sunset"></div></div>
+            <span>Підкладка Заходу</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon"><div class="dot-style-a"></div></div>
+            <span>Рівнодення та Сонцестояння</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon"><div class="dot-style-b"></div></div>
+            <span>Річні екстремуми часу</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon"><div class="line-red"></div></div>
+            <span>Лінія стрімкості зміни часу</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Астрономічні події</div>
+        <div class="events-list" id="eventsListA"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Річні екстремуми</div>
+        <div class="events-list" id="eventsListB"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let LAT = 48.62;
+  let LON = 26.04;
+  let useDST = true;
+  let currentAngle = 0;
+  let shiftDays = 0;
+  let activeView = 'both';
+
+  const months = ["Січ", "Лют", "Бер", "Квi", "Тра", "Чер", "Лип", "Сер", "Вер", "Жов", "Лис", "Гру"];
+  const monthStartDays = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
+
+  function getSeasonInfo(day) {
+    if (day >= 335 || day < 60) return { name: "Зима", color: "#38bdf8" };
+    if (day >= 60 && day < 152) return { name: "Весна", color: "#4ade80" };
+    if (day >= 152 && day < 244) return { name: "Літо", color: "#facc15" };
+    return { name: "Осінь", color: "#fb923c" };
+  }
+
+  function dayToDateStr(day) {
+    let d = new Date(2026, 0, day);
+    return `${d.getDate()} ${months[d.getMonth()]}`;
+  }
+
+  function minToTimeStr(min) {
+    if (min === null || isNaN(min)) return "--:--";
+    const h = Math.floor(min / 60).toString().padStart(2, '0');
+    const m = Math.floor(min % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  function minToDurStr(min) {
+    if (min === null || isNaN(min)) return "--г --хв";
+    const h = Math.floor(min / 60);
+    const m = Math.floor(min % 60);
+    return `${h}г ${m}хв`;
+  }
+
+  function calculateSunTimes(dayOfYear, lat, lon) {
+    const gamma = (2 * Math.PI / 365) * (dayOfYear - 1);
+    const eqtime = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma) - 0.032077 * Math.sin(gamma) 
+                 - 0.014615 * Math.cos(2 * gamma) - 0.040849 * Math.sin(2 * gamma));
+    
+    const decl = 0.006918 - 0.399912 * Math.cos(gamma) + 0.070257 * Math.sin(gamma)
+               - 0.006758 * Math.cos(2 * gamma) + 0.000907 * Math.sin(2 * gamma)
+               - 0.002697 * Math.cos(3 * gamma) + 0.00148 * Math.sin(3 * gamma);
+
+    const latRad = lat * Math.PI / 180;
+    const cosHA = (Math.cos(90.833 * Math.PI / 180) / (Math.cos(latRad) * Math.cos(decl))) 
+                 - Math.tan(latRad) * Math.tan(decl);
+
+    if (cosHA > 1 || cosHA < -1) return { sunrise: null, sunset: null };
+
+    const haDeg = Math.acos(cosHA) * 180 / Math.PI;
+    const solarNoonUTC = 720 - (4 * lon) - eqtime;
+    const sunriseUTC = solarNoonUTC - (4 * haDeg);
+    const sunsetUTC = solarNoonUTC + (4 * haDeg);
+
+    const isDST = useDST && (dayOfYear >= 88 && dayOfYear <= 298); 
+    const tzOffset = isDST ? 180 : 120; 
+
+    return {
+      sunrise: (sunriseUTC + tzOffset + 1440) % 1440,
+      sunset: (sunsetUTC + tzOffset + 1440) % 1440
+    };
+  }
+
+  const MORNING_MIN = 240;  // 04:00
+  const MORNING_MAX = 540;  // 09:00
+  const EVENING_MIN = 900;  // 15:00
+  const EVENING_MAX = 1320; // 22:00
+
+  function timeToFrac(t) {
+    if (t === null || isNaN(t)) return 0;
+    if (t <= MORNING_MAX) {
+      let rel = Math.max(0, (t - MORNING_MIN) / (MORNING_MAX - MORNING_MIN));
+      return rel * 0.475; // 0.00 .. 0.475
+    } else if (t < EVENING_MIN) {
+      let rel = (t - MORNING_MAX) / (EVENING_MIN - MORNING_MAX);
+      return 0.475 + rel * 0.05; // 0.475 .. 0.525 (вузька 5% смужка)
+    } else {
+      let rel = Math.min(1, (t - EVENING_MIN) / (EVENING_MAX - EVENING_MIN));
+      return 0.525 + rel * 0.475; // 0.525 .. 1.00
+    }
+  }
+
+  let yearSunsetData = [];
+  let yearSunriseData = [];
+  let yearDayLenData = [];
+  let eventsA = [];
+  let eventsB = [];
+
+  function updateYearData() {
+    yearSunsetData = [];
+    yearSunriseData = [];
+    yearDayLenData = [];
+
+    for (let i = 1; i <= 365; i++) {
+      const times = calculateSunTimes(i, LAT, LON);
+      yearSunriseData.push(times.sunrise);
+      yearSunsetData.push(times.sunset);
+      let len = (times.sunset !== null && times.sunrise !== null) ? (times.sunset - times.sunrise + 1440) % 1440 : 0;
+      yearDayLenData.push(len);
+    }
+
+    eventsA = [
+      { name: "Весняне рівнодення", short: "В.Рівн", day: 80 },
+      { name: "Літнє сонцестояння", short: "Л.Сонц", day: 172 },
+      { name: "Осіннє рівнодення", short: "О.Рівн", day: 266 },
+      { name: "Зимове сонцестояння", short: "З.Сонц", day: 355 }
+    ];
+
+    let minSunriseDay = 1, maxSunriseDay = 1;
+    let minSunsetDay = 1, maxSunsetDay = 1;
+
+    for (let i = 0; i < 365; i++) {
+      if (yearSunriseData[i] < yearSunriseData[minSunriseDay - 1]) minSunriseDay = i + 1;
+      if (yearSunriseData[i] > yearSunriseData[maxSunriseDay - 1]) maxSunriseDay = i + 1;
+      if (yearSunsetData[i] < yearSunsetData[minSunsetDay - 1]) minSunsetDay = i + 1;
+      if (yearSunsetData[i] > yearSunsetData[maxSunsetDay - 1]) maxSunsetDay = i + 1;
+    }
+
+    eventsB = [
+      { name: "Найраніший схід", short: "Мін.Схід", day: minSunriseDay, time: yearSunriseData[minSunriseDay - 1], type: 'sunrise' },
+      { name: "Найпізніший схід", short: "Макс.Схід", day: maxSunriseDay, time: yearSunriseData[maxSunriseDay - 1], type: 'sunrise' },
+      { name: "Найраніший захід", short: "Мін.Захід", day: minSunsetDay, time: yearSunsetData[minSunsetDay - 1], type: 'sunset' },
+      { name: "Найпізніший захід", short: "Макс.Захід", day: maxSunsetDay, time: yearSunsetData[maxSunsetDay - 1], type: 'sunset' }
+    ];
+
+    renderSidebarEvents();
+  }
+
+  function renderSidebarEvents() {
+    const listA = document.getElementById('eventsListA');
+    listA.innerHTML = eventsA.map(e => {
+      const season = getSeasonInfo(e.day);
+      return `
+        <div class="event-card" style="border-left-color: ${season.color}">
+          <span class="event-name">${e.name}</span>
+          <span class="event-val" style="color: ${season.color}">${dayToDateStr(e.day)}</span>
+        </div>
+      `;
+    }).join('');
+
+    const listB = document.getElementById('eventsListB');
+    listB.innerHTML = eventsB.map(e => {
+      const season = getSeasonInfo(e.day);
+      return `
+        <div class="event-card" style="border-left-color: ${season.color}">
+          <span class="event-name">${e.name}</span>
+          <span class="event-val" style="color: ${season.color}">${dayToDateStr(e.day)} (${minToTimeStr(e.time)})</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  updateYearData();
+
+  // Оригінальна математика розрахунку крутизни з sunset_combo.html
+  function getSteepnessArray(dataArray) {
+    let diffs = new Array(365);
+    let maxDiff = 0.001;
+    for (let i = 0; i < 365; i++) {
+      let prev = dataArray[(i - 1 + 365) % 365];
+      let next = dataArray[(i + 1) % 365];
+      
+      let d1 = Math.abs(dataArray[i] - prev);
+      if (d1 > 30) d1 = Math.abs(d1 - 60); 
+      let d2 = Math.abs(next - dataArray[i]);
+      if (d2 > 30) d2 = Math.abs(d2 - 60);
+
+      let avg = (d1 + d2) / 2;
+      diffs[i] = avg;
+      if (avg > maxDiff) maxDiff = avg;
+    }
+    return { diffs, maxDiff };
+  }
+
+  const pCanvas = document.getElementById('polarCanvas');
+  const pCtx = pCanvas.getContext('2d');
+  const lCanvas = document.getElementById('linearCanvas');
+  const lCtx = lCanvas.getContext('2d');
+
+  function resizeCanvases() {
+    if (activeView === 'both' || activeView === 'polar') {
+      pCanvas.width = pCanvas.parentElement.clientWidth * window.devicePixelRatio;
+      pCanvas.height = pCanvas.parentElement.clientHeight * window.devicePixelRatio;
+    }
+    if (activeView === 'both' || activeView === 'linear') {
+      lCanvas.width = lCanvas.parentElement.clientWidth * window.devicePixelRatio;
+      lCanvas.height = lCanvas.parentElement.clientHeight * window.devicePixelRatio;
+    }
+  }
+  window.addEventListener('resize', () => { resizeCanvases(); updateAll(); });
+
+  // Малювання Полярного Графіку
+  function drawPolarChart() {
+    const w = pCanvas.width;
+    const h = pCanvas.height;
+    const dpr = window.devicePixelRatio;
+    pCtx.clearRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const maxRadius = (Math.min(w, h) / 2) - (42 * dpr);
+    const minRadius = maxRadius * 0.38;
+
+    function valToRadius(v) {
+      return minRadius + timeToFrac(v) * (maxRadius - minRadius);
+    }
+
+    pCtx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    pCtx.lineWidth = 1 * dpr;
+    pCtx.setLineDash([3, 3]);
+
+    let r04 = valToRadius(240);
+    let r09 = valToRadius(540);
+    let r15 = valToRadius(900);
+    let r22 = valToRadius(1320);
+
+    pCtx.beginPath(); pCtx.arc(cx, cy, r04, 0, Math.PI * 2); pCtx.stroke();
+    pCtx.beginPath(); pCtx.arc(cx, cy, r22, 0, Math.PI * 2); pCtx.stroke();
+    pCtx.beginPath(); pCtx.arc(cx, cy, r09, 0, Math.PI * 2); pCtx.stroke();
+    pCtx.beginPath(); pCtx.arc(cx, cy, r15, 0, Math.PI * 2); pCtx.stroke();
+    pCtx.setLineDash([]);
+
+    pCtx.fillStyle = 'rgba(255,255,255,0.03)';
+    pCtx.beginPath();
+    pCtx.arc(cx, cy, r15, 0, Math.PI * 2);
+    pCtx.arc(cx, cy, r09, 0, Math.PI * 2, true);
+    pCtx.fill();
+
+    pCtx.fillStyle = '#64748b';
+    pCtx.font = `${8.5 * dpr}px system-ui`;
+    pCtx.textAlign = 'center';
+    pCtx.fillText('09:00–15:00', cx, cy - r09 - (3 * dpr));
+
+    for (let m = 0; m < 12; m++) {
+      let mDay = monthStartDays[m];
+      let angle = ((mDay - 1) / 365) * Math.PI * 2 + (Math.PI / 2);
+      pCtx.beginPath();
+      pCtx.moveTo(cx + Math.cos(angle) * (minRadius - 4), cy + Math.sin(angle) * (minRadius - 4));
+      pCtx.lineTo(cx + Math.cos(angle) * (maxRadius + 8), cy + Math.sin(angle) * (maxRadius + 8));
+      pCtx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      pCtx.stroke();
+
+      let xText = cx + Math.cos(angle) * (maxRadius + 22 * dpr);
+      let yText = cy + Math.sin(angle) * (maxRadius + 22 * dpr);
+      pCtx.fillStyle = '#94a3b8';
+      pCtx.font = `${9.5 * dpr}px system-ui`;
+      pCtx.textAlign = 'center';
+      pCtx.textBaseline = 'middle';
+      pCtx.fillText(months[m], xText, yText);
+    }
+
+    // Заповнення між Сходом і Заходом
+    const conicGrad = pCtx.createConicGradient(Math.PI / 2, cx, cy);
+    for (let s = 0; s <= 36; s++) {
+      let frac = s / 36;
+      let dayIdx = Math.min(365, Math.floor(frac * 365) + 1);
+      conicGrad.addColorStop(frac, getSeasonInfo(dayIdx).color + '20');
+    }
+
+    pCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let angle = (i / 365) * Math.PI * 2 + (Math.PI / 2);
+      let r = valToRadius(yearSunsetData[i]);
+      let x = cx + Math.cos(angle) * r;
+      let y = cy + Math.sin(angle) * r;
+      if (i === 0) pCtx.moveTo(x, y); else pCtx.lineTo(x, y);
+    }
+    for (let i = 364; i >= 0; i--) {
+      let angle = (i / 365) * Math.PI * 2 + (Math.PI / 2);
+      let r = valToRadius(yearSunriseData[i]);
+      let x = cx + Math.cos(angle) * r;
+      let y = cy + Math.sin(angle) * r;
+      pCtx.lineTo(x, y);
+    }
+    pCtx.closePath();
+    pCtx.fillStyle = conicGrad;
+    pCtx.fill();
+
+    // 1. ПІДКЛАДКИ ДЛЯ СХОДУ ТА ЗАХОДУ
+    // Підкладка Сходу
+    pCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let angle = (i / 365) * Math.PI * 2 + (Math.PI / 2);
+      let r = valToRadius(yearSunriseData[i]);
+      let x = cx + Math.cos(angle) * r;
+      let y = cy + Math.sin(angle) * r;
+      if (i === 0) pCtx.moveTo(x, y); else pCtx.lineTo(x, y);
+    }
+    pCtx.closePath();
+    pCtx.strokeStyle = 'rgba(255, 237, 165, 1)';
+    pCtx.lineWidth = 7 * dpr;
+    pCtx.stroke();
+
+    // Підкладка Заходу
+    pCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let angle = (i / 365) * Math.PI * 2 + (Math.PI / 2);
+      let r = valToRadius(yearSunsetData[i]);
+      let x = cx + Math.cos(angle) * r;
+      let y = cy + Math.sin(angle) * r;
+      if (i === 0) pCtx.moveTo(x, y); else pCtx.lineTo(x, y);
+    }
+    pCtx.closePath();
+    pCtx.strokeStyle = 'rgba(188, 83, 31, 1)';
+    pCtx.lineWidth = 7 * dpr;
+    pCtx.stroke();
+
+    // 2. ОСНОВНІ ГРАДІЄНТНІ ЛІНІЇ
+    for (let i = 0; i < 365; i++) {
+      let iNext = (i + 1) % 365;
+      let a1 = (i / 365) * Math.PI * 2 + (Math.PI / 2);
+      let a2 = (iNext / 365) * Math.PI * 2 + (Math.PI / 2);
+
+      let sColor = getSeasonInfo(i + 1).color;
+
+      // Схід
+      let rSr1 = valToRadius(yearSunriseData[i]);
+      let rSr2 = valToRadius(yearSunriseData[iNext]);
+      pCtx.beginPath();
+      pCtx.moveTo(cx + Math.cos(a1) * rSr1, cy + Math.sin(a1) * rSr1);
+      pCtx.lineTo(cx + Math.cos(a2) * rSr2, cy + Math.sin(a2) * rSr2);
+      pCtx.strokeStyle = sColor;
+      pCtx.lineWidth = 2.8 * dpr;
+      pCtx.stroke();
+
+      // Захід
+      let rSs1 = valToRadius(yearSunsetData[i]);
+      let rSs2 = valToRadius(yearSunsetData[iNext]);
+      pCtx.beginPath();
+      pCtx.moveTo(cx + Math.cos(a1) * rSs1, cy + Math.sin(a1) * rSs1);
+      pCtx.lineTo(cx + Math.cos(a2) * rSs2, cy + Math.sin(a2) * rSs2);
+      pCtx.strokeStyle = sColor;
+      pCtx.lineWidth = 2.8 * dpr;
+      pCtx.stroke();
+    }
+
+    // 3. Червона лінія стрімкості (ОКРЕМО ДЛЯ СХОДУ І ДЛЯ ЗАХОДУ, ТОЧНО ЯК У sunset_combo.html)
+    const steepSs = getSteepnessArray(yearSunsetData);
+    const steepSr = getSteepnessArray(yearSunriseData);
+
+    pCtx.lineWidth = 2 * dpr;
+    for (let i = 0; i < 365; i++) {
+      let iNext = (i + 1) % 365;
+      let a1 = (i / 365) * Math.PI * 2 + (Math.PI / 2);
+      let a2 = (iNext / 365) * Math.PI * 2 + (Math.PI / 2);
+
+      // ЧЕРВОНА ЛІНІЯ НА ЗАХОДІ
+      let rSs1 = valToRadius(yearSunsetData[i]) + (8 * dpr);
+      let rSs2 = valToRadius(yearSunsetData[iNext]) + (8 * dpr);
+      let alphaSs = ((steepSs.diffs[i] + steepSs.diffs[iNext]) / (2 * steepSs.maxDiff)) * 0.60;
+      if (alphaSs > 0.005) {
+        pCtx.beginPath();
+        pCtx.moveTo(cx + Math.cos(a1) * rSs1, cy + Math.sin(a1) * rSs1);
+        pCtx.lineTo(cx + Math.cos(a2) * rSs2, cy + Math.sin(a2) * rSs2);
+        pCtx.strokeStyle = `rgba(239, 68, 68, ${alphaSs})`;
+        pCtx.stroke();
+      }
+
+      // ЧЕРВОНА ЛІНІЯ НА СХОДІ
+      let rSr1 = valToRadius(yearSunriseData[i]) - (8 * dpr);
+      let rSr2 = valToRadius(yearSunriseData[iNext]) - (8 * dpr);
+      let alphaSr = ((steepSr.diffs[i] + steepSr.diffs[iNext]) / (2 * steepSr.maxDiff)) * 0.60;
+      if (alphaSr > 0.005) {
+        pCtx.beginPath();
+        pCtx.moveTo(cx + Math.cos(a1) * rSr1, cy + Math.sin(a1) * rSr1);
+        pCtx.lineTo(cx + Math.cos(a2) * rSr2, cy + Math.sin(a2) * rSr2);
+        pCtx.strokeStyle = `rgba(239, 68, 68, ${alphaSr})`;
+        pCtx.stroke();
+      }
+    }
+
+    // 4. Точки Рівнодення/Сонцестояння
+    eventsA.forEach(ev => {
+      let a = ((ev.day - 1) / 365) * Math.PI * 2 + (Math.PI / 2);
+      let season = getSeasonInfo(ev.day);
+
+      // На Заході
+      let rSs = valToRadius(yearSunsetData[ev.day - 1]);
+      let xSs = cx + Math.cos(a) * rSs;
+      let ySs = cy + Math.sin(a) * rSs;
+      pCtx.beginPath();
+      pCtx.arc(xSs, ySs, 4 * dpr, 0, Math.PI * 2);
+      pCtx.fillStyle = '#ffffff';
+      pCtx.fill();
+      pCtx.strokeStyle = '#0f172a';
+      pCtx.lineWidth = 1 * dpr;
+      pCtx.stroke();
+      drawCanvasLabel(pCtx, ev.short, xSs, ySs, season.color, true, dpr);
+
+      // На Сході
+      let rSr = valToRadius(yearSunriseData[ev.day - 1]);
+      let xSr = cx + Math.cos(a) * rSr;
+      let ySr = cy + Math.sin(a) * rSr;
+      pCtx.beginPath();
+      pCtx.arc(xSr, ySr, 4 * dpr, 0, Math.PI * 2);
+      pCtx.fillStyle = '#ffffff';
+      pCtx.fill();
+      pCtx.strokeStyle = '#0f172a';
+      pCtx.lineWidth = 1 * dpr;
+      pCtx.stroke();
+      drawCanvasLabel(pCtx, ev.short, xSr, ySr, season.color, true, dpr);
+    });
+
+    // 5. Точки Річних Екстремумів
+    eventsB.forEach(ev => {
+      let a = ((ev.day - 1) / 365) * Math.PI * 2 + (Math.PI / 2);
+      let val = ev.type === 'sunrise' ? yearSunriseData[ev.day - 1] : yearSunsetData[ev.day - 1];
+      let r = valToRadius(val);
+      let x = cx + Math.cos(a) * r;
+      let y = cy + Math.sin(a) * r;
+      let season = getSeasonInfo(ev.day);
+
+      pCtx.beginPath();
+      pCtx.arc(x, y, 3 * dpr, 0, Math.PI * 2);
+      pCtx.fillStyle = '#0b1120';
+      pCtx.fill();
+      pCtx.strokeStyle = '#ffffff';
+      pCtx.lineWidth = 1.5 * dpr;
+      pCtx.stroke();
+
+      drawCanvasLabel(pCtx, ev.short, x, y, season.color, false, dpr);
+    });
+
+    // 6. Маркер активного дня
+    const normAngle = ((currentAngle % 360) + 360) % 360;
+    const selectedDay = Math.min(364, Math.floor((normAngle / 360) * 365)) + 1;
+    const season = getSeasonInfo(selectedDay);
+    const targetAngle = ((selectedDay - 1) / 365) * Math.PI * 2 + (Math.PI / 2);
+
+    pCtx.beginPath();
+    pCtx.moveTo(cx + Math.cos(targetAngle) * (minRadius * 0.7), cy + Math.sin(targetAngle) * (minRadius * 0.7));
+    pCtx.lineTo(cx + Math.cos(targetAngle) * (maxRadius + 10), cy + Math.sin(targetAngle) * (maxRadius + 10));
+    pCtx.strokeStyle = season.color;
+    pCtx.lineWidth = 1.5 * dpr;
+    pCtx.setLineDash([3, 3]);
+    pCtx.stroke();
+    pCtx.setLineDash([]);
+
+    let rSrActive = valToRadius(yearSunriseData[selectedDay - 1]);
+    pCtx.beginPath();
+    pCtx.arc(cx + Math.cos(targetAngle) * rSrActive, cy + Math.sin(targetAngle) * rSrActive, 5 * dpr, 0, Math.PI * 2);
+    pCtx.fillStyle = '#ffffff';
+    pCtx.fill();
+
+    let rSsActive = valToRadius(yearSunsetData[selectedDay - 1]);
+    pCtx.beginPath();
+    pCtx.arc(cx + Math.cos(targetAngle) * rSsActive, cy + Math.sin(targetAngle) * rSsActive, 6.5 * dpr, 0, Math.PI * 2);
+    pCtx.fillStyle = '#ffffff';
+    pCtx.shadowColor = season.color;
+    pCtx.shadowBlur = 14;
+    pCtx.fill();
+    pCtx.shadowBlur = 0;
+  }
+
+  // Малювання Класичного Графіку
+  function drawLinearChart() {
+    const w = lCanvas.width;
+    const h = lCanvas.height;
+    const dpr = window.devicePixelRatio;
+    lCtx.clearRect(0, 0, w, h);
+
+    const padLeft = 44 * dpr;
+    const padBottom = 22 * dpr;
+    const padTop = 15 * dpr;
+    const padRight = 12 * dpr;
+    const plotW = w - padLeft - padRight;
+    const plotH = h - padTop - padBottom;
+
+    function getCanvasY(t) {
+      return padTop + plotH - timeToFrac(t) * plotH;
+    }
+
+    // Сітка Y
+    lCtx.strokeStyle = 'rgba(255,255,255,0.07)';
+    lCtx.fillStyle = '#64748b';
+    lCtx.font = `${8.5 * dpr}px system-ui`;
+    lCtx.textAlign = 'right';
+
+    const yTimes = [240, 360, 480, 540, 900, 1020, 1140, 1260, 1320];
+    yTimes.forEach(t => {
+      let y = getCanvasY(t);
+      lCtx.beginPath(); lCtx.moveTo(padLeft, y); lCtx.lineTo(w - padRight, y); lCtx.stroke();
+      lCtx.fillText(minToTimeStr(t), padLeft - 5 * dpr, y + 3 * dpr);
+    });
+
+    // Смуга стиснутого денного проміжку
+    let y09 = getCanvasY(540);
+    let y15 = getCanvasY(900);
+
+    lCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    lCtx.fillRect(padLeft, y15, plotW, y09 - y15);
+
+    lCtx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    lCtx.setLineDash([3, 3]);
+    lCtx.beginPath(); lCtx.moveTo(padLeft, y09); lCtx.lineTo(w - padRight, y09); lCtx.stroke();
+    lCtx.beginPath(); lCtx.moveTo(padLeft, y15); lCtx.lineTo(w - padRight, y15); lCtx.stroke();
+    lCtx.setLineDash([]);
+
+    lCtx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+    lCtx.textAlign = 'center';
+    lCtx.textBaseline = 'middle';
+    lCtx.fillText('☀️ 09:00 — 15:00 (Денна перерва)', padLeft + plotW / 2, (y09 + y15) / 2);
+
+    // Сітка X
+    for (let m = 0; m < 12; m++) {
+      let mDay = monthStartDays[m];
+      let displayPos = (mDay - 1 - shiftDays + 36500) % 365;
+      let x = padLeft + (displayPos / 364) * plotW;
+      lCtx.beginPath(); lCtx.moveTo(x, padTop); lCtx.lineTo(x, padTop + plotH); lCtx.stroke();
+      lCtx.fillText(months[m], x, h - 5 * dpr);
+    }
+
+    let fillGrad = lCtx.createLinearGradient(padLeft, 0, padLeft + plotW, 0);
+    let strokeGrad = lCtx.createLinearGradient(padLeft, 0, padLeft + plotW, 0);
+
+    for (let i = 0; i <= 20; i++) {
+      let frac = i / 20;
+      let dayIdx = Math.floor((shiftDays + frac * 365) % 365) + 1;
+      let sInfo = getSeasonInfo(dayIdx);
+      fillGrad.addColorStop(frac, sInfo.color + '20');
+      strokeGrad.addColorStop(frac, sInfo.color);
+    }
+
+    // Заповнення між Сходом та Заходом
+    lCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let actualDay = ((shiftDays + i) % 365) + 1;
+      let val = yearSunsetData[actualDay - 1];
+      let x = padLeft + (i / 364) * plotW;
+      let y = getCanvasY(val);
+      if (i === 0) lCtx.moveTo(x, y); else lCtx.lineTo(x, y);
+    }
+    for (let i = 364; i >= 0; i--) {
+      let actualDay = ((shiftDays + i) % 365) + 1;
+      let val = yearSunriseData[actualDay - 1];
+      let x = padLeft + (i / 364) * plotW;
+      let y = getCanvasY(val);
+      lCtx.lineTo(x, y);
+    }
+    lCtx.closePath();
+    lCtx.fillStyle = fillGrad;
+    lCtx.fill();
+
+    // 1. ПІДКЛАДКИ СХОДУ ТА ЗАХОДУ
+    // Підкладка Сходу
+    lCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let actualDay = ((shiftDays + i) % 365) + 1;
+      let val = yearSunriseData[actualDay - 1];
+      let x = padLeft + (i / 364) * plotW;
+      let y = getCanvasY(val);
+      if (i === 0) lCtx.moveTo(x, y); else lCtx.lineTo(x, y);
+    }
+    lCtx.strokeStyle = 'rgba(254, 240, 138, 1)';
+    lCtx.lineWidth = 7 * dpr;
+    lCtx.stroke();
+
+    // Підкладка Заходу
+    lCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let actualDay = ((shiftDays + i) % 365) + 1;
+      let val = yearSunsetData[actualDay - 1];
+      let x = padLeft + (i / 364) * plotW;
+      let y = getCanvasY(val);
+      if (i === 0) lCtx.moveTo(x, y); else lCtx.lineTo(x, y);
+    }
+    lCtx.strokeStyle = 'rgba(254, 215, 170, 1)';
+    lCtx.lineWidth = 7 * dpr;
+    lCtx.stroke();
+
+    // 2. ОСНОВНІ ГРАДІЄНТНІ ЛІНІЇ
+    // Схід
+    lCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let actualDay = ((shiftDays + i) % 365) + 1;
+      let val = yearSunriseData[actualDay - 1];
+      let x = padLeft + (i / 364) * plotW;
+      let y = getCanvasY(val);
+      if (i === 0) lCtx.moveTo(x, y); else lCtx.lineTo(x, y);
+    }
+    lCtx.strokeStyle = strokeGrad;
+    lCtx.lineWidth = 2.8 * dpr;
+    lCtx.stroke();
+
+    // Захід
+    lCtx.beginPath();
+    for (let i = 0; i < 365; i++) {
+      let actualDay = ((shiftDays + i) % 365) + 1;
+      let val = yearSunsetData[actualDay - 1];
+      let x = padLeft + (i / 364) * plotW;
+      let y = getCanvasY(val);
+      if (i === 0) lCtx.moveTo(x, y); else lCtx.lineTo(x, y);
+    }
+    lCtx.strokeStyle = strokeGrad;
+    lCtx.lineWidth = 2.8 * dpr;
+    lCtx.stroke();
+
+    // 3. Червоні лінії стрімкості (ОКРЕМО ДЛЯ СХОДУ І ДЛЯ ЗАХОДУ, ТОЧНО ЯК У sunset_combo.html)
+    const steepSs = getSteepnessArray(yearSunsetData);
+    const steepSr = getSteepnessArray(yearSunriseData);
+
+    const redOffset = 12 * dpr;
+    lCtx.lineWidth = 2 * dpr;
+
+    for (let i = 0; i < 364; i++) {
+      let d1 = ((shiftDays + i) % 365) + 1;
+      let d2 = ((shiftDays + i + 1) % 365) + 1;
+      let val1Ss = yearSunsetData[d1 - 1];
+      let val2Ss = yearSunsetData[d2 - 1];
+      let val1Sr = yearSunriseData[d1 - 1];
+      let val2Sr = yearSunriseData[d2 - 1];
+
+      let x1 = padLeft + (i / 364) * plotW;
+      let x2 = padLeft + ((i + 1) / 364) * plotW;
+
+      // На Заході (поверх кривої заходу)
+      if (val1Ss !== null && val2Ss !== null) {
+        let ySs1 = getCanvasY(val1Ss) - redOffset;
+        let ySs2 = getCanvasY(val2Ss) - redOffset;
+        let alphaSs = ((steepSs.diffs[d1 - 1] + steepSs.diffs[d2 - 1]) / (2 * steepSs.maxDiff)) * 0.60;
+        if (alphaSs > 0.005) {
+          lCtx.beginPath();
+          lCtx.strokeStyle = `rgba(239, 68, 68, ${alphaSs})`;
+          lCtx.moveTo(x1, ySs1); lCtx.lineTo(x2, ySs2);
+          lCtx.stroke();
+        }
+      }
+
+      // На Сході (під кривою сходу)
+      if (val1Sr !== null && val2Sr !== null) {
+        let ySr1 = getCanvasY(val1Sr) + redOffset;
+        let ySr2 = getCanvasY(val2Sr) + redOffset;
+        let alphaSr = ((steepSr.diffs[d1 - 1] + steepSr.diffs[d2 - 1]) / (2 * steepSr.maxDiff)) * 0.60;
+        if (alphaSr > 0.005) {
+          lCtx.beginPath();
+          lCtx.strokeStyle = `rgba(239, 68, 68, ${alphaSr})`;
+          lCtx.moveTo(x1, ySr1); lCtx.lineTo(x2, ySr2);
+          lCtx.stroke();
+        }
+      }
+    }
+
+    // 4. Точки Рівнодення/Сонцестояння
+    eventsA.forEach(ev => {
+      let displayIdx = (ev.day - 1 - shiftDays + 36500) % 365;
+      let x = padLeft + (displayIdx / 364) * plotW;
+      let season = getSeasonInfo(ev.day);
+
+      // На Заході
+      let ySs = getCanvasY(yearSunsetData[ev.day - 1]);
+      lCtx.beginPath();
+      lCtx.arc(x, ySs, 4 * dpr, 0, Math.PI * 2);
+      lCtx.fillStyle = '#ffffff';
+      lCtx.fill();
+      lCtx.strokeStyle = '#0f172a';
+      lCtx.lineWidth = 1 * dpr;
+      lCtx.stroke();
+      drawCanvasLabel(lCtx, ev.short, x, ySs, season.color, true, dpr);
+
+      // На Сході
+      let ySr = getCanvasY(yearSunriseData[ev.day - 1]);
+      lCtx.beginPath();
+      lCtx.arc(x, ySr, 4 * dpr, 0, Math.PI * 2);
+      lCtx.fillStyle = '#ffffff';
+      lCtx.fill();
+      lCtx.strokeStyle = '#0f172a';
+      lCtx.lineWidth = 1 * dpr;
+      lCtx.stroke();
+      drawCanvasLabel(lCtx, ev.short, x, ySr, season.color, true, dpr);
+    });
+
+    // 5. Точки Річних Екстремумів
+    eventsB.forEach(ev => {
+      let displayIdx = (ev.day - 1 - shiftDays + 36500) % 365;
+      let x = padLeft + (displayIdx / 364) * plotW;
+      let val = ev.type === 'sunrise' ? yearSunriseData[ev.day - 1] : yearSunsetData[ev.day - 1];
+      let y = getCanvasY(val);
+      let season = getSeasonInfo(ev.day);
+
+      lCtx.beginPath();
+      lCtx.arc(x, y, 3 * dpr, 0, Math.PI * 2);
+      lCtx.fillStyle = '#0b1120';
+      lCtx.fill();
+      lCtx.strokeStyle = '#ffffff';
+      lCtx.lineWidth = 1.5 * dpr;
+      lCtx.stroke();
+
+      drawCanvasLabel(lCtx, ev.short, x, y, season.color, false, dpr);
+    });
+
+    // 6. Маркер активного дня
+    const normAngle = ((currentAngle % 360) + 360) % 360;
+    const selectedDay = Math.min(364, Math.floor((normAngle / 360) * 365)) + 1;
+    const season = getSeasonInfo(selectedDay);
+
+    let activeDisplayIdx = (selectedDay - 1 - shiftDays + 36500) % 365;
+    let targetX = padLeft + (activeDisplayIdx / 364) * plotW;
+
+    lCtx.beginPath();
+    lCtx.strokeStyle = season.color + 'A0';
+    lCtx.lineWidth = 1.5 * dpr;
+    lCtx.setLineDash([4, 4]);
+    lCtx.moveTo(targetX, padTop); lCtx.lineTo(targetX, padTop + plotH); lCtx.stroke();
+    lCtx.setLineDash([]);
+
+    let targetY_Sr = getCanvasY(yearSunriseData[selectedDay - 1]);
+    lCtx.beginPath();
+    lCtx.arc(targetX, targetY_Sr, 5 * dpr, 0, Math.PI * 2);
+    lCtx.fillStyle = '#ffffff';
+    lCtx.fill();
+
+    let targetY_Ss = getCanvasY(yearSunsetData[selectedDay - 1]);
+    lCtx.beginPath();
+    lCtx.arc(targetX, targetY_Ss, 6.5 * dpr, 0, Math.PI * 2);
+    lCtx.fillStyle = '#ffffff';
+    lCtx.shadowColor = season.color;
+    lCtx.shadowBlur = 14;
+    lCtx.fill();
+    lCtx.shadowBlur = 0;
+  }
+
+  // Універсальний підпис точок
+  function drawCanvasLabel(ctx, text, x, y, colorStr, isBelow, dpr) {
+    ctx.save();
+    ctx.font = `bold ${8.5 * dpr}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+
+    let labelY = isBelow ? y + (10 * dpr) : y - (6 * dpr);
+    ctx.textBaseline = isBelow ? 'top' : 'bottom';
+
+    ctx.strokeStyle = 'rgba(11, 17, 32, 0.9)';
+    ctx.lineWidth = 3 * dpr;
+    ctx.strokeText(text, x, labelY);
+
+    ctx.fillStyle = colorStr;
+    ctx.fillText(text, x, labelY);
+    ctx.restore();
+  }
+
+  // Синхронне оновлення всіх елементів
+  function updateAll() {
+    const normAngle = ((currentAngle % 360) + 360) % 360;
+    const selectedDay = Math.min(364, Math.floor((normAngle / 360) * 365)) + 1;
+    const season = getSeasonInfo(selectedDay);
+    const dateStr = dayToDateStr(selectedDay);
+    const sunriseStr = minToTimeStr(yearSunriseData[selectedDay - 1]);
+    const sunsetStr = minToTimeStr(yearSunsetData[selectedDay - 1]);
+    const dayLenStr = minToDurStr(yearDayLenData[selectedDay - 1]);
+
+    // Тексти Полярного
+    document.getElementById('pDateVal').innerText = dateStr;
+    document.getElementById('pSunriseVal').innerText = sunriseStr;
+    document.getElementById('pSunsetVal').innerText = sunsetStr;
+    document.getElementById('pDayLenVal').innerText = dayLenStr;
+    const pBadge = document.getElementById('pSeasonBadge');
+    pBadge.innerText = season.name;
+    pBadge.style.backgroundColor = season.color + '25';
+    pBadge.style.color = season.color;
+
+    // Тексти Класичного
+    document.getElementById('lDateVal').innerText = dateStr;
+    document.getElementById('lDateVal').style.color = season.color;
+    document.getElementById('lSunriseVal').innerText = sunriseStr;
+    document.getElementById('lSunsetVal').innerText = sunsetStr;
+    document.getElementById('lDayLenVal').innerText = dayLenStr;
+    const lBadge = document.getElementById('lSeasonBadge');
+    lBadge.innerText = season.name;
+    lBadge.style.backgroundColor = season.color + '25';
+    lBadge.style.color = season.color;
+
+    // Диск
+    const dialCenter = document.getElementById('dialCenterText');
+    dialCenter.innerText = dateStr;
+    dialCenter.style.color = season.color;
+    dialCenter.style.borderColor = season.color + '50';
+    const pointer = document.getElementById('pointer');
+    pointer.style.transform = `rotate(${normAngle}deg)`;
+    pointer.style.backgroundColor = season.color;
+    pointer.style.boxShadow = `0 0 10px ${season.color}`;
+    document.getElementById('shiftSlider').style.accentColor = season.color;
+
+    if (activeView === 'both' || activeView === 'polar') drawPolarChart();
+    if (activeView === 'both' || activeView === 'linear') drawLinearChart();
+  }
+
+  // Інтерактив Полярного графіку
+  const polarContainer = document.getElementById('polarContainer');
+  let isPolarDragging = false;
+
+  function updatePolarFromEvent(e) {
+    const rect = pCanvas.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    let rad = Math.atan2(clientY - cy, clientX - cx);
+    let deg = rad * (180 / Math.PI) - 90;
+    if (deg < 0) deg += 360;
+    currentAngle = deg;
+    updateAll();
+  }
+
+  polarContainer.addEventListener('mousedown', (e) => { isPolarDragging = true; updatePolarFromEvent(e); });
+  window.addEventListener('mousemove', (e) => { if (isPolarDragging) updatePolarFromEvent(e); });
+  window.addEventListener('mouseup', () => isPolarDragging = false);
+  polarContainer.addEventListener('touchstart', (e) => { isPolarDragging = true; updatePolarFromEvent(e); });
+  window.addEventListener('touchmove', (e) => { if (isPolarDragging) updatePolarFromEvent(e); });
+  window.addEventListener('touchend', () => isPolarDragging = false);
+
+  // Інтерактив Класичного графіку
+  const linearContainer = document.getElementById('linearContainer');
+  let isLinearDragging = false;
+
+  function updateLinearFromEvent(e) {
+    const rect = lCanvas.getBoundingClientRect();
+    const padLeft = 44;
+    const padRight = 12;
+    const plotW = rect.width - padLeft - padRight;
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let relX = clientX - rect.left - padLeft;
+    let frac = relX / plotW;
+    if (frac < 0) frac = 0;
+    if (frac > 1) frac = 1;
+
+    let displayDayIdx = frac * 364;
+    let actualDay = Math.round((displayDayIdx + shiftDays) % 365) + 1;
+    if (actualDay < 1) actualDay += 365;
+
+    currentAngle = ((actualDay - 1) / 365) * 360;
+    updateAll();
+  }
+
+  linearContainer.addEventListener('mousedown', (e) => { isLinearDragging = true; updateLinearFromEvent(e); });
+  window.addEventListener('mousemove', (e) => { if (isLinearDragging) updateLinearFromEvent(e); });
+  window.addEventListener('mouseup', () => isLinearDragging = false);
+  linearContainer.addEventListener('touchstart', (e) => { isLinearDragging = true; updateLinearFromEvent(e); });
+  window.addEventListener('touchmove', (e) => { if (isLinearDragging) updateLinearFromEvent(e); });
+  window.addEventListener('touchend', () => isLinearDragging = false);
+
+  // Інтерактив Диска (Колеса)
+  const dial = document.getElementById('dial');
+  let isDialDragging = false;
+  let lastAngle = null;
+
+  function getDialAngle(e) {
+    const rect = dial.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    let rad = Math.atan2(clientY - cy, clientX - cx);
+    let deg = rad * (180 / Math.PI) + 90;
+    if (deg < 0) deg += 360;
+    return deg;
+  }
+
+  dial.addEventListener('mousedown', (e) => { isDialDragging = true; lastAngle = getDialAngle(e); });
+  window.addEventListener('mousemove', (e) => {
+    if (!isDialDragging) return;
+    const newAngle = getDialAngle(e);
+    let delta = newAngle - lastAngle;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    currentAngle += delta;
+    lastAngle = newAngle;
+    updateAll();
+  });
+  window.addEventListener('mouseup', () => isDialDragging = false);
+
+  dial.addEventListener('touchstart', (e) => { isDialDragging = true; lastAngle = getDialAngle(e); });
+  window.addEventListener('touchmove', (e) => {
+    if (!isDialDragging) return;
+    const newAngle = getDialAngle(e);
+    let delta = newAngle - lastAngle;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    currentAngle += delta;
+    lastAngle = newAngle;
+    updateAll();
+  });
+  window.addEventListener('touchend', () => isDialDragging = false);
+
+  // Слайдер зсуву осі
+  document.getElementById('shiftSlider').addEventListener('input', (e) => {
+    shiftDays = parseInt(e.target.value);
+    updateAll();
+  });
+
+  // Тумблер DST
+  document.getElementById('dstToggle').addEventListener('change', (e) => {
+    useDST = e.target.checked;
+    updateYearData();
+    updateAll();
+  });
+
+  // Координати
+  function onCoordsChange() {
+    LAT = parseFloat(document.getElementById('latInput').value) || 0;
+    LON = parseFloat(document.getElementById('lonInput').value) || 0;
+    if (Math.abs(LAT - 48.62) < 0.1 && Math.abs(LON - 26.04) < 0.1) {
+      document.getElementById('locationTitle').innerText = "🌅 Схід та Захід сонця — Колодрібка";
+    } else {
+      document.getElementById('locationTitle').innerText = `🌅 Схід та Захід сонця (${LAT}°, ${LON}°)`;
+    }
+    updateYearData();
+    updateAll();
+  }
+  document.getElementById('latInput').addEventListener('change', onCoordsChange);
+  document.getElementById('lonInput').addEventListener('change', onCoordsChange);
+
+  // Перемикач виглядів (Обидва / Полярний / Класичний)
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeView = btn.dataset.view;
+
+      const pSec = document.getElementById('polarSection');
+      const lSec = document.getElementById('linearSection');
+
+      if (activeView === 'both') {
+        pSec.classList.remove('hidden');
+        lSec.classList.remove('hidden');
+      } else if (activeView === 'polar') {
+        pSec.classList.remove('hidden');
+        lSec.classList.add('hidden');
+      } else if (activeView === 'linear') {
+        pSec.classList.add('hidden');
+        lSec.classList.remove('hidden');
+      }
+
+      setTimeout(() => {
+        resizeCanvases();
+        updateAll();
+      }, 50);
+    });
+  });
+
+  // Початковий запуск
+  resizeCanvases();
+  updateAll();
+</script>
+</body>
+</html>
